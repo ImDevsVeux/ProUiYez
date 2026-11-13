@@ -1,15 +1,9 @@
-
 --[[
-added new themes  
-and more
-todo: faster loading lucide icons 
-NOTE - THIS UI LIB NOT MINE so whoever made Wmac lib
-credits to them and the person who remake it thanks to him too!
+Credits: this UI lib is not mine thanks to whoever made WMacLib and the person who remade it.
 ]]
-
-local WMacLib = { 
-	Options = {}, 
-	Folder = "Maclib", 
+local WMacLib = {
+	Options = {},
+	Folder = "Maclib",
 	Themes = {},
 	_watermarks = {},
 	CurrentTheme = "Dark",
@@ -99,6 +93,96 @@ do
 			return ""
 		end
 		return path
+	end
+end
+
+WMacLib.ParagraphColors = {
+	Red = Color3.fromRGB(239, 68, 68),
+	Green = Color3.fromRGB(34, 197, 94),
+	Blue = Color3.fromRGB(59, 130, 246),
+	Yellow = Color3.fromRGB(234, 179, 8),
+	Orange = Color3.fromRGB(249, 115, 22),
+	Purple = Color3.fromRGB(168, 85, 247),
+	Grey = Color3.fromRGB(113, 113, 122),
+}
+
+WMacLib.Creator = {}
+
+function WMacLib.Creator.Request(options)
+	local requester = (syn and syn.request) or http_request or request or (fluxus and fluxus.request) or (http and http.request)
+	if requester then
+		return requester(options)
+	end
+	if tostring(options.Method or "GET"):upper() == "GET" then
+		return { Success = true, StatusCode = 200, Body = game:HttpGet(options.Url) }
+	end
+	error("No HTTP request function available")
+end
+
+do
+	local imageCache = {}
+
+	local function hashString(text)
+		local hash = 5381
+		for i = 1, #text do
+			hash = (hash * 33 + text:byte(i)) % 4294967296
+		end
+		return string.format("%08x", hash)
+	end
+
+	function WMacLib:LoadRemoteImage(url, instance, prop)
+		prop = prop or "Image"
+		local cached = imageCache[url]
+		if cached then
+			instance[prop] = cached
+			return
+		end
+		local assetFn = getcustomasset or getsynasset
+		if not (assetFn and writefile) then
+			return
+		end
+		task.spawn(function()
+			local ok, asset = pcall(function()
+				local folder = self.Folder .. "/images"
+				if makefolder and isfolder then
+					if not isfolder(self.Folder) then
+						makefolder(self.Folder)
+					end
+					if not isfolder(folder) then
+						makefolder(folder)
+					end
+				end
+				local response = WMacLib.Creator.Request({ Url = url, Method = "GET" })
+				local body = response and response.Body
+				if type(body) ~= "string" or #body == 0 then
+					error("empty image")
+				end
+				local path = folder .. "/" .. hashString(url) .. ".png"
+				writefile(path, body)
+				return assetFn(path)
+			end)
+			if ok and asset then
+				imageCache[url] = asset
+				if instance and instance.Parent then
+					instance[prop] = asset
+				end
+			end
+		end)
+	end
+
+	function WMacLib:SetImage(instance, prop, source)
+		if type(source) ~= "string" or source == "" then
+			return
+		end
+		if source:match("^https?://") then
+			self:LoadRemoteImage(source, instance, prop)
+			return
+		end
+		if source:match("^%d+$") or source:find("rbxasset") or source:find("/") then
+			self:ResolveImage(source, instance, prop)
+			return
+		end
+		self:ResolveImage("lucide/" .. source, instance, prop)
 	end
 end
 
@@ -250,7 +334,6 @@ WMacLib:AddTheme({
 	Icon = Color3.fromRGB(230, 190, 80),
 })
 
---// Services
 local TweenService = WMacLib.GetService("TweenService")
 local RunService = WMacLib.GetService("RunService")
 local HttpService = WMacLib.GetService("HttpService")
@@ -259,7 +342,6 @@ local UserInputService = WMacLib.GetService("UserInputService")
 local Lighting = WMacLib.GetService("Lighting")
 local Players = WMacLib.GetService("Players")
 
---// Variables
 local isStudio = RunService:IsStudio()
 local LocalPlayer = Players.LocalPlayer
 
@@ -289,7 +371,6 @@ local assets = {
 	sliderhead = "rbxassetid://18772834246",
 }
 
---// Functions
 local function GetGui()
 	local newGui = Instance.new("ScreenGui")
 	newGui.ScreenInsets = Enum.ScreenInsets.None
@@ -297,7 +378,7 @@ local function GetGui()
 	newGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	newGui.DisplayOrder = 2147483647
 
-	local parent = RunService:IsStudio() 
+	local parent = RunService:IsStudio()
 		and LocalPlayer:FindFirstChild("PlayerGui")
 		or (gethui and gethui())
 		or (cloneref and cloneref(WMacLib.GetService("CoreGui")) or WMacLib.GetService("CoreGui"))
@@ -310,10 +391,9 @@ local function Tween(instance, tweeninfo, propertytable)
 	return TweenService:Create(instance, tweeninfo, propertytable)
 end
 
---// Library Functions
 function WMacLib:Window(Settings)
 	local WindowFunctions = {Settings = Settings}
-	-- the window is always solid (no acrylic / see-through look)
+
 	acrylicBlur = false
 
 	local _defaultTheme = {
@@ -341,7 +421,6 @@ function WMacLib:Window(Settings)
 
 	local macLib = GetGui()
 
-	-- main title gets the rainbow gradient (skipped if you pass your own rich text)
 	local function styleTitle(text)
 		text = tostring(text or "")
 		if Settings.RainbowTitle == false or text:find("<") then
@@ -567,7 +646,7 @@ function WMacLib:Window(Settings)
 		applyState(button, isEnabled)
 	end
 
-	controls.Visible = false -- replaced by the "-" and "x" buttons in the top bar
+	controls.Visible = false
 	controls.Parent = windowControls
 
 	local divider1 = Instance.new("Frame")
@@ -760,7 +839,6 @@ function WMacLib:Window(Settings)
 	informationGroupUIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 	informationGroupUIListLayout.Parent = informationGroup
 
-	-- avatar is only fetched if user info is actually turned on
 	local headshotImage, isReady
 	local function loadHeadshot()
 		if isReady ~= nil then return end
@@ -948,7 +1026,7 @@ function WMacLib:Window(Settings)
 	local function ChangeState(State)
 		Tween(divider, TweenInfo.new(0.2, TweenSettings.EasingStyle), {
 			BackgroundTransparency = State == "Idle" and TweenSettings.DefaultTransparency or TweenSettings.HoverTransparency
-		}):Play()  
+		}):Play()
 	end
 
 	dividerInteract.MouseEnter:Connect(function()
@@ -1020,7 +1098,6 @@ function WMacLib:Window(Settings)
 	uIPadding2.PaddingRight = UDim.new(0, 20)
 	uIPadding2.Parent = elements
 
-	-- Window buttons (top right): "-" minimize, "x" close. Replaces the old drag icon.
 	local WinUI = {}
 	do
 		local topButtons = Instance.new("Frame")
@@ -1106,7 +1183,6 @@ function WMacLib:Window(Settings)
 			if table.find(Settings.DisabledWindowControls, "Exit") then WinUI.Close.Visible = false end
 		end
 
-		-- Dragging: hold the top bar (title area) and move. DragStyle 2 still drags from anywhere.
 		local dragging_ = false
 		local dragStart, startPos
 
@@ -1460,10 +1536,10 @@ function WMacLib:Window(Settings)
 			end
 		end
 		DrawQuad(
-			camera:ScreenPointToRay(tl.x, tl.y, zIndex).Origin, 
-			camera:ScreenPointToRay(tr.x, tr.y, zIndex).Origin, 
-			camera:ScreenPointToRay(bl.x, bl.y, zIndex).Origin, 
-			camera:ScreenPointToRay(br.x, br.y, zIndex).Origin, 
+			camera:ScreenPointToRay(tl.x, tl.y, zIndex).Origin,
+			camera:ScreenPointToRay(tr.x, tr.y, zIndex).Origin,
+			camera:ScreenPointToRay(bl.x, bl.y, zIndex).Origin,
+			camera:ScreenPointToRay(br.x, br.y, zIndex).Origin,
 			parts
 		)
 		if fetchProps then
@@ -1953,7 +2029,6 @@ function WMacLib:Window(Settings)
 					button.Size = UDim2.new(1, 0, 0, 38)
 					button.Parent = section
 
-					-- outlined card look
 					local buttonCorner = Instance.new("UICorner")
 					buttonCorner.Name = "ButtonCorner"
 					buttonCorner.CornerRadius = UDim.new(0, 6)
@@ -2986,19 +3061,20 @@ function WMacLib:Window(Settings)
 					local dropdownName = Instance.new("TextLabel")
 					dropdownName.Name = "DropdownName"
 					dropdownName.FontFace = Font.new(assets.interFont, DropdownFunctions.Settings.Bold and Enum.FontWeight.Bold or Enum.FontWeight.Regular, Enum.FontStyle.Normal)
-					dropdownName.Text = Settings.Default and (DropdownFunctions.Settings.Name .. " • " .. table.concat(Selected, ", ")) or (DropdownFunctions.Settings.Name .. "...")
+					dropdownName.Text = DropdownFunctions.Settings.Name .. "..."
 					dropdownName.RichText = true
 					setThemed(dropdownName, "TextColor3", "Text")
 					dropdownName.TextSize = 13
 					dropdownName.TextTransparency = 0.5
-					dropdownName.TextTruncate = Enum.TextTruncate.SplitWord
+					dropdownName.TextTruncate = Enum.TextTruncate.AtEnd
+					dropdownName.TextWrapped = false
 					dropdownName.TextXAlignment = Enum.TextXAlignment.Left
-					dropdownName.AutomaticSize = Enum.AutomaticSize.Y
+					dropdownName.TextYAlignment = Enum.TextYAlignment.Center
 					dropdownName.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					dropdownName.BackgroundTransparency = 1
 					dropdownName.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					dropdownName.BorderSizePixel = 0
-					dropdownName.Size = UDim2.new(1, -20, 0, 38)
+					dropdownName.Size = UDim2.new(1, -25, 0, 38)
 					dropdownName.Parent = dropdown
 
 					local dropdownUIStroke = Instance.new("UIStroke")
@@ -3153,6 +3229,14 @@ function WMacLib:Window(Settings)
 						waitTime = 1
 					}
 
+					local function refreshLabel()
+						if #Selected > 0 then
+							dropdownName.Text = DropdownFunctions.Settings.Name .. " • <b>" .. table.concat(Selected, ", ") .. "</b>"
+						else
+							dropdownName.Text = DropdownFunctions.Settings.Name .. "..."
+						end
+					end
+
 					local function Toggle(optionName, State)
 						local option = OptionObjs[optionName]
 
@@ -3211,11 +3295,7 @@ function WMacLib:Window(Settings)
 							return
 						end
 
-						if #Selected > 0 then
-							dropdownName.Text = DropdownFunctions.Settings.Name .. " • " .. table.concat(Selected, ", ")
-						else
-							dropdownName.Text = DropdownFunctions.Settings.Name .. "..."
-						end
+						refreshLabel()
 					end
 
 					local dropped = false
@@ -3372,6 +3452,10 @@ function WMacLib:Window(Settings)
 							local isSelected = table.find(Selected, v) and true or false
 							local newSelected = not isSelected
 
+							if not DropdownFunctions.Settings.Multi and isSelected then
+								return
+							end
+
 							if DropdownFunctions.Settings.Required and not newSelected and #Selected <= 1 then
 								return
 							end
@@ -3489,6 +3573,7 @@ function WMacLib:Window(Settings)
 						end
 						OptionObjs = {}
 						Selected = {}
+						refreshLabel()
 
 						if dropped then
 							dropdown.Size = UDim2.new(1, 0, 0, CalculateDropdownSize())
@@ -4545,7 +4630,7 @@ function WMacLib:Window(Settings)
 						modifierInputs.Blue.Text = tostring(math.floor(c.b * 255 + 0.5))
 						modifierInputs.Alpha.Text = clampInput(modifierInputs.Alpha.Text, 0, 1)
 
-						local hexColor = string.format("#%02X%02X%02X", 
+						local hexColor = string.format("#%02X%02X%02X",
 							math.floor(c.r * 255 + 0.5),
 							math.floor(c.g * 255 + 0.5),
 							math.floor(c.b * 255 + 0.5))
@@ -4931,7 +5016,7 @@ function WMacLib:Window(Settings)
 					labelText.Name = "LabelText"
 					labelText.FontFace = Font.new(assets.interFont, LabelFunctions.Settings.Bold and Enum.FontWeight.Bold or Enum.FontWeight.Regular, Enum.FontStyle.Normal)
 					labelText.RichText = true
-					labelText.Text = LabelFunctions.Settings.Text or LabelFunctions.Settings.Name -- Settings.Name Deprecated use Settings.Text
+					labelText.Text = LabelFunctions.Settings.Text or LabelFunctions.Settings.Name
 					setThemed(labelText, "TextColor3", "Text")
 					labelText.TextSize = 13
 					labelText.TextTransparency = 0.5
@@ -4981,7 +5066,7 @@ function WMacLib:Window(Settings)
 					subLabelText.Name = "SubLabelText"
 					subLabelText.FontFace = Font.new(assets.interFont, SubLabelFunctions.Settings.Bold and Enum.FontWeight.Bold or Enum.FontWeight.Regular, Enum.FontStyle.Normal)
 					subLabelText.RichText = true
-					subLabelText.Text = SubLabelFunctions.Settings.Text or SubLabelFunctions.Settings.Name -- Settings.Name Deprecated use Settings.Text
+					subLabelText.Text = SubLabelFunctions.Settings.Text or SubLabelFunctions.Settings.Name
 					setThemed(subLabelText, "TextColor3", "Text")
 					subLabelText.TextSize = 12
 					subLabelText.TextTransparency = 0.7
@@ -5015,7 +5100,19 @@ function WMacLib:Window(Settings)
 				end
 
 				function SectionFunctions:Paragraph(Settings, Flag)
+					Settings = Settings or {}
 					local ParagraphFunctions = {Settings = Settings}
+
+					local titleText = Settings.Title or Settings.Header or ""
+					local descText = Settings.Desc or Settings.Body or ""
+					local tint = Settings.Color
+					if type(tint) == "string" then
+						tint = WMacLib.ParagraphColors[tint]
+					end
+					if typeof(tint) ~= "Color3" then
+						tint = nil
+					end
+					local hasCard = tint ~= nil or Settings.Image ~= nil or Settings.Thumbnail ~= nil or Settings.Buttons ~= nil
 
 					local paragraph = Instance.new("Frame")
 					paragraph.Name = "Paragraph"
@@ -5024,8 +5121,125 @@ function WMacLib:Window(Settings)
 					paragraph.BackgroundTransparency = 1
 					paragraph.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					paragraph.BorderSizePixel = 0
-					paragraph.Size = UDim2.new(1, 0, 0, 38)
+					paragraph.Size = UDim2.new(1, 0, 0, hasCard and 0 or 38)
 					paragraph.Parent = section
+
+					local paragraphLayout = Instance.new("UIListLayout")
+					paragraphLayout.Name = "UIListLayout"
+					paragraphLayout.Padding = UDim.new(0, hasCard and 8 or 5)
+					paragraphLayout.SortOrder = Enum.SortOrder.LayoutOrder
+					paragraphLayout.Parent = paragraph
+
+					if hasCard then
+						local paragraphCorner = Instance.new("UICorner")
+						paragraphCorner.Name = "ParagraphCorner"
+						paragraphCorner.CornerRadius = UDim.new(0, 6)
+						paragraphCorner.Parent = paragraph
+
+						local paragraphStroke = Instance.new("UIStroke")
+						paragraphStroke.Name = "ParagraphOutline"
+						paragraphStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+						paragraphStroke.Thickness = 1
+						if tint then
+							paragraphStroke.Color = tint
+							paragraphStroke.Transparency = 0.5
+							paragraph.BackgroundColor3 = tint
+							paragraph.BackgroundTransparency = 0.88
+						else
+							setThemed(paragraphStroke, "Color", "Outline")
+							paragraphStroke.Transparency = 0.55
+							setThemed(paragraph, "BackgroundColor3", "Surface")
+							paragraph.BackgroundTransparency = 0.94
+						end
+						paragraphStroke.Parent = paragraph
+
+						local paragraphPadding = Instance.new("UIPadding")
+						paragraphPadding.Name = "ParagraphPadding"
+						paragraphPadding.PaddingTop = UDim.new(0, 10)
+						paragraphPadding.PaddingBottom = UDim.new(0, 10)
+						paragraphPadding.PaddingLeft = UDim.new(0, 10)
+						paragraphPadding.PaddingRight = UDim.new(0, 10)
+						paragraphPadding.Parent = paragraph
+					end
+
+					local paragraphThumbnail
+					if Settings.Thumbnail then
+						paragraphThumbnail = Instance.new("ImageLabel")
+						paragraphThumbnail.Name = "ParagraphThumbnail"
+						paragraphThumbnail.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+						paragraphThumbnail.BackgroundTransparency = 1
+						paragraphThumbnail.BorderSizePixel = 0
+						paragraphThumbnail.ScaleType = Enum.ScaleType.Crop
+						paragraphThumbnail.LayoutOrder = 0
+						paragraphThumbnail.Size = UDim2.new(1, 0, 0, Settings.ThumbnailSize or 80)
+						paragraphThumbnail.Parent = paragraph
+
+						local thumbnailCorner = Instance.new("UICorner")
+						thumbnailCorner.CornerRadius = UDim.new(0, 6)
+						thumbnailCorner.Parent = paragraphThumbnail
+
+						WMacLib:SetImage(paragraphThumbnail, "Image", Settings.Thumbnail)
+					end
+
+					local paragraphTop = Instance.new("Frame")
+					paragraphTop.Name = "ParagraphTop"
+					paragraphTop.AutomaticSize = Enum.AutomaticSize.Y
+					paragraphTop.BackgroundTransparency = 1
+					paragraphTop.BorderSizePixel = 0
+					paragraphTop.LayoutOrder = 1
+					paragraphTop.Size = UDim2.new(1, 0, 0, 0)
+					paragraphTop.Parent = paragraph
+
+					local paragraphTopLayout = Instance.new("UIListLayout")
+					paragraphTopLayout.Name = "UIListLayout"
+					paragraphTopLayout.FillDirection = Enum.FillDirection.Horizontal
+					paragraphTopLayout.Padding = UDim.new(0, 10)
+					paragraphTopLayout.SortOrder = Enum.SortOrder.LayoutOrder
+					paragraphTopLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+					paragraphTopLayout.Parent = paragraphTop
+
+					local imageSize = Settings.ImageSize or 32
+					local paragraphImage
+					if Settings.Image then
+						paragraphImage = Instance.new("ImageLabel")
+						paragraphImage.Name = "ParagraphImage"
+						paragraphImage.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+						paragraphImage.BackgroundTransparency = 1
+						paragraphImage.BorderSizePixel = 0
+						paragraphImage.LayoutOrder = 0
+						paragraphImage.Size = UDim2.fromOffset(imageSize, imageSize)
+						paragraphImage.Parent = paragraphTop
+
+						local imageCorner = Instance.new("UICorner")
+						imageCorner.CornerRadius = UDim.new(0, 8)
+						imageCorner.Parent = paragraphImage
+
+						local isRemote = type(Settings.Image) == "string" and Settings.Image:match("^https?://") ~= nil
+						if not isRemote then
+							if tint then
+								paragraphImage.ImageColor3 = tint
+							else
+								setThemed(paragraphImage, "ImageColor3", "Text")
+								paragraphImage.ImageTransparency = 0.3
+							end
+						end
+						WMacLib:SetImage(paragraphImage, "Image", Settings.Image)
+					end
+
+					local paragraphText = Instance.new("Frame")
+					paragraphText.Name = "ParagraphText"
+					paragraphText.AutomaticSize = Enum.AutomaticSize.Y
+					paragraphText.BackgroundTransparency = 1
+					paragraphText.BorderSizePixel = 0
+					paragraphText.LayoutOrder = 1
+					paragraphText.Size = UDim2.new(1, paragraphImage and -(imageSize + 10) or 0, 0, 0)
+					paragraphText.Parent = paragraphTop
+
+					local paragraphTextLayout = Instance.new("UIListLayout")
+					paragraphTextLayout.Name = "UIListLayout"
+					paragraphTextLayout.Padding = UDim.new(0, 5)
+					paragraphTextLayout.SortOrder = Enum.SortOrder.LayoutOrder
+					paragraphTextLayout.Parent = paragraphText
 
 					local paragraphHeader = Instance.new("TextLabel")
 					paragraphHeader.Name = "ParagraphHeader"
@@ -5035,10 +5249,15 @@ function WMacLib:Window(Settings)
 						Enum.FontStyle.Normal
 					)
 					paragraphHeader.RichText = true
-					paragraphHeader.Text = ParagraphFunctions.Settings.Header
-					setThemed(paragraphHeader, "TextColor3", "Text")
+					paragraphHeader.Text = tostring(titleText)
+					if tint then
+						paragraphHeader.TextColor3 = tint
+						paragraphHeader.TextTransparency = 0
+					else
+						setThemed(paragraphHeader, "TextColor3", "Text")
+						paragraphHeader.TextTransparency = 0.4
+					end
 					paragraphHeader.TextSize = 15
-					paragraphHeader.TextTransparency = 0.4
 					paragraphHeader.TextWrapped = true
 					paragraphHeader.TextXAlignment = Enum.TextXAlignment.Left
 					paragraphHeader.AutomaticSize = Enum.AutomaticSize.Y
@@ -5046,20 +5265,16 @@ function WMacLib:Window(Settings)
 					paragraphHeader.BackgroundTransparency = 1
 					paragraphHeader.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					paragraphHeader.BorderSizePixel = 0
+					paragraphHeader.LayoutOrder = 0
 					paragraphHeader.Size = UDim2.fromScale(1, 0)
-					paragraphHeader.Parent = paragraph
-
-					local uIListLayout = Instance.new("UIListLayout")
-					uIListLayout.Name = "UIListLayout"
-					uIListLayout.Padding = UDim.new(0, 5)
-					uIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-					uIListLayout.Parent = paragraph
+					paragraphHeader.Visible = tostring(titleText) ~= ""
+					paragraphHeader.Parent = paragraphText
 
 					local paragraphBody = Instance.new("TextLabel")
 					paragraphBody.Name = "ParagraphBody"
-					paragraphBody.FontFace = Font.new(assets.interFont, ParagraphFunctions.Settings.Bold and Enum.FontWeight.Bold or Enum.FontWeight.Regular, Enum.FontStyle.Normal)
+					paragraphBody.FontFace = Font.new(assets.interFont, Settings.Bold and Enum.FontWeight.Bold or Enum.FontWeight.Regular, Enum.FontStyle.Normal)
 					paragraphBody.RichText = true
-					paragraphBody.Text = ParagraphFunctions.Settings.Body
+					paragraphBody.Text = tostring(descText)
 					setThemed(paragraphBody, "TextColor3", "Text")
 					paragraphBody.TextSize = 13
 					paragraphBody.TextTransparency = 0.5
@@ -5072,16 +5287,159 @@ function WMacLib:Window(Settings)
 					paragraphBody.BorderSizePixel = 0
 					paragraphBody.LayoutOrder = 1
 					paragraphBody.Size = UDim2.fromScale(1, 0)
-					paragraphBody.Parent = paragraph
+					paragraphBody.Visible = tostring(descText) ~= ""
+					paragraphBody.Parent = paragraphText
 
+					local paragraphButtons
+					local buttonObjects = {}
+					if type(Settings.Buttons) == "table" and #Settings.Buttons > 0 then
+						paragraphButtons = Instance.new("Frame")
+						paragraphButtons.Name = "ParagraphButtons"
+						paragraphButtons.AutomaticSize = Enum.AutomaticSize.Y
+						paragraphButtons.BackgroundTransparency = 1
+						paragraphButtons.BorderSizePixel = 0
+						paragraphButtons.LayoutOrder = 2
+						paragraphButtons.Size = UDim2.new(1, 0, 0, 0)
+						paragraphButtons.Parent = paragraph
+
+						local buttonsLayout = Instance.new("UIListLayout")
+						buttonsLayout.Name = "UIListLayout"
+						buttonsLayout.FillDirection = Enum.FillDirection.Horizontal
+						buttonsLayout.Wraps = true
+						buttonsLayout.Padding = UDim.new(0, 6)
+						buttonsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+						buttonsLayout.Parent = paragraphButtons
+
+						for index, buttonSettings in ipairs(Settings.Buttons) do
+							local paragraphButton = Instance.new("TextButton")
+							paragraphButton.Name = "ParagraphButton"
+							paragraphButton.Text = ""
+							paragraphButton.AutoButtonColor = false
+							paragraphButton.AutomaticSize = Enum.AutomaticSize.X
+							paragraphButton.Size = UDim2.new(0, 0, 0, 28)
+							paragraphButton.LayoutOrder = index
+							paragraphButton.BorderSizePixel = 0
+							setThemed(paragraphButton, "BackgroundColor3", "Surface")
+							paragraphButton.BackgroundTransparency = 0.9
+							paragraphButton.Parent = paragraphButtons
+
+							local buttonCorner = Instance.new("UICorner")
+							buttonCorner.CornerRadius = UDim.new(0, 6)
+							buttonCorner.Parent = paragraphButton
+
+							local buttonStroke = Instance.new("UIStroke")
+							buttonStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+							buttonStroke.Thickness = 1
+							setThemed(buttonStroke, "Color", "Outline")
+							buttonStroke.Transparency = 0.7
+							buttonStroke.Parent = paragraphButton
+
+							local buttonPadding = Instance.new("UIPadding")
+							buttonPadding.PaddingLeft = UDim.new(0, 10)
+							buttonPadding.PaddingRight = UDim.new(0, 10)
+							buttonPadding.Parent = paragraphButton
+
+							local buttonList = Instance.new("UIListLayout")
+							buttonList.FillDirection = Enum.FillDirection.Horizontal
+							buttonList.Padding = UDim.new(0, 6)
+							buttonList.SortOrder = Enum.SortOrder.LayoutOrder
+							buttonList.VerticalAlignment = Enum.VerticalAlignment.Center
+							buttonList.Parent = paragraphButton
+
+							if buttonSettings.Icon then
+								local buttonIcon = Instance.new("ImageLabel")
+								buttonIcon.Name = "ButtonIcon"
+								buttonIcon.BackgroundTransparency = 1
+								buttonIcon.BorderSizePixel = 0
+								buttonIcon.LayoutOrder = 0
+								buttonIcon.Size = UDim2.fromOffset(14, 14)
+								setThemed(buttonIcon, "ImageColor3", "Text")
+								buttonIcon.ImageTransparency = 0.3
+								buttonIcon.Parent = paragraphButton
+								WMacLib:SetImage(buttonIcon, "Image", buttonSettings.Icon)
+							end
+
+							local buttonLabel = Instance.new("TextLabel")
+							buttonLabel.Name = "ButtonLabel"
+							buttonLabel.FontFace = Font.new(assets.interFont, Enum.FontWeight.Medium, Enum.FontStyle.Normal)
+							buttonLabel.RichText = true
+							buttonLabel.Text = tostring(buttonSettings.Title or buttonSettings.Name or "")
+							setThemed(buttonLabel, "TextColor3", "Text")
+							buttonLabel.TextSize = 12
+							buttonLabel.TextTransparency = 0.3
+							buttonLabel.AutomaticSize = Enum.AutomaticSize.X
+							buttonLabel.BackgroundTransparency = 1
+							buttonLabel.BorderSizePixel = 0
+							buttonLabel.LayoutOrder = 1
+							buttonLabel.Size = UDim2.new(0, 0, 1, 0)
+							buttonLabel.Parent = paragraphButton
+
+							paragraphButton.MouseEnter:Connect(function()
+								Tween(paragraphButton, TweenInfo.new(0.2, Enum.EasingStyle.Sine), {BackgroundTransparency = 0.8}):Play()
+								Tween(buttonStroke, TweenInfo.new(0.2, Enum.EasingStyle.Sine), {Transparency = 0.4}):Play()
+							end)
+							paragraphButton.MouseLeave:Connect(function()
+								Tween(paragraphButton, TweenInfo.new(0.2, Enum.EasingStyle.Sine), {BackgroundTransparency = 0.9}):Play()
+								Tween(buttonStroke, TweenInfo.new(0.2, Enum.EasingStyle.Sine), {Transparency = 0.7}):Play()
+							end)
+							paragraphButton.MouseButton1Click:Connect(function()
+								if buttonSettings.Callback then
+									task.spawn(function()
+										pcall(buttonSettings.Callback)
+									end)
+								end
+							end)
+
+							buttonObjects[index] = {
+								Instance = paragraphButton,
+								SetTitle = function(_, new)
+									buttonLabel.Text = tostring(new)
+								end,
+							}
+						end
+					end
+
+					local function setBody(new)
+						new = tostring(new)
+						paragraphBody.Text = new
+						paragraphBody.Visible = new ~= ""
+					end
+					local function setHeader(new)
+						new = tostring(new)
+						paragraphHeader.Text = new
+						paragraphHeader.Visible = new ~= ""
+					end
+
+					function ParagraphFunctions:SetDesc(New)
+						setBody(New)
+					end
+					function ParagraphFunctions:SetTitle(New)
+						setHeader(New)
+					end
 					function ParagraphFunctions:UpdateHeader(New)
-						paragraphHeader.Text = New
+						setHeader(New)
 					end
 					function ParagraphFunctions:UpdateBody(New)
-						paragraphBody.Text = New
+						setBody(New)
+					end
+					function ParagraphFunctions:SetBody(New)
+						setBody(New)
 					end
 					function ParagraphFunctions:SetName(New)
-						paragraphHeader.Text = New
+						setHeader(New)
+					end
+					function ParagraphFunctions:SetImage(New)
+						if paragraphImage then
+							WMacLib:SetImage(paragraphImage, "Image", New)
+						end
+					end
+					function ParagraphFunctions:SetThumbnail(New)
+						if paragraphThumbnail then
+							WMacLib:SetImage(paragraphThumbnail, "Image", New)
+						end
+					end
+					function ParagraphFunctions:GetButton(Index)
+						return buttonObjects[Index]
 					end
 					function ParagraphFunctions:SetVisibility(State)
 						paragraph.Visible = State
@@ -5240,7 +5598,7 @@ function WMacLib:Window(Settings)
 
 				if isStudio then
 					configSection:Label({Text = "Config system unavailable. (Environment isStudio)"})
-					return "Config system unavailable." 
+					return "Config system unavailable."
 				end
 
 				local inputPath = nil
@@ -5899,7 +6257,7 @@ function WMacLib:Window(Settings)
 
 	function WindowFunctions:Unload()
 		if onUnloadCallback then
-			onUnloadCallback()  
+			onUnloadCallback()
 		end
 		for _, wm in ipairs(WMacLib._watermarks) do
 			wm:Destroy()
@@ -5932,7 +6290,6 @@ function WMacLib:Window(Settings)
 		end
 	end)
 
-	-- Minimized pill (like WindUI's open button): sits at the top of the screen, click it to reopen.
 	do
 		local restPos = UDim2.new(0.5, 0, 0, 12)
 
@@ -5993,7 +6350,6 @@ function WMacLib:Window(Settings)
 			Tween(pillScale, TweenInfo.new(0.12, Enum.EasingStyle.Sine), { Scale = 1 }):Play()
 		end)
 
-		-- drag the pill around; a click without moving reopens the menu
 		local pDrag, pMoved, pStart, pStartPos = false, false, nil, nil
 
 		pill.InputBegan:Connect(function(input)
@@ -6043,7 +6399,6 @@ function WMacLib:Window(Settings)
 		end
 	end
 
-	-- "x": warning first, then the window is really closed (same flow as WindUI)
 	function WindowFunctions:Close()
 		WindowFunctions:Dialog({
 			Title = Settings.Title,
@@ -6074,7 +6429,7 @@ function WMacLib:Window(Settings)
 	end
 
 	function WindowFunctions:SetAcrylicBlurState(State)
-		-- kept for compatibility: the window stays solid
+
 		acrylicBlur = false
 		base.BackgroundTransparency = 0
 	end
@@ -6109,7 +6464,7 @@ function WMacLib:Window(Settings)
 	if Settings.ShowUserInfo ~= nil then
 		showUserInfo = Settings.ShowUserInfo
 	else
-		showUserInfo = false -- hidden by default
+		showUserInfo = false
 	end
 
 	_SetUserInfoState(showUserInfo)
@@ -6144,8 +6499,8 @@ function WMacLib:Window(Settings)
 		["Toggle"] = {
 			Save = function(Flag, data)
 				return {
-					type = "Toggle", 
-					flag = Flag, 
+					type = "Toggle",
+					flag = Flag,
 					state = data.State or false
 				}
 			end,
@@ -6158,8 +6513,8 @@ function WMacLib:Window(Settings)
 		["Slider"] = {
 			Save = function(Flag, data)
 				return {
-					type = "Slider", 
-					flag = Flag, 
+					type = "Slider",
+					flag = Flag,
 					value = (data.Value and tostring(data.Value)) or false
 				}
 			end,
@@ -6172,8 +6527,8 @@ function WMacLib:Window(Settings)
 		["Input"] = {
 			Save = function(Flag, data)
 				return {
-					type = "Input", 
-					flag = Flag, 
+					type = "Input",
+					flag = Flag,
 					text = data.Text
 				}
 			end,
@@ -6186,8 +6541,8 @@ function WMacLib:Window(Settings)
 		["Keybind"] = {
 			Save = function(Flag, data)
 				return {
-					type = "Keybind", 
-					flag = Flag, 
+					type = "Keybind",
+					flag = Flag,
 					bind = (typeof(data.Bind) == "EnumItem" and data.Bind.Name) or nil
 				}
 			end,
@@ -6200,8 +6555,8 @@ function WMacLib:Window(Settings)
 		["Dropdown"] = {
 			Save = function(Flag, data)
 				return {
-					type = "Dropdown", 
-					flag = Flag, 
+					type = "Dropdown",
+					flag = Flag,
 					value = data.Value
 				}
 			end,
@@ -6218,8 +6573,8 @@ function WMacLib:Window(Settings)
 				end
 
 				return {
-					type = "Colorpicker", 
-					flag = Flag, 
+					type = "Colorpicker",
+					flag = Flag,
 					color = Color3ToHex(data.Color) or nil,
 					alpha = data.Alpha
 				}
@@ -6233,7 +6588,7 @@ function WMacLib:Window(Settings)
 				end
 
 				if WMacLib.Options[Flag] and data.color then
-					WMacLib.Options[Flag]:SetColor(HexToColor3(data.color)) 
+					WMacLib.Options[Flag]:SetColor(HexToColor3(data.color))
 					if data.alpha then
 						WMacLib.Options[Flag]:SetAlpha(data.alpha)
 					end
@@ -6304,7 +6659,7 @@ function WMacLib:Window(Settings)
 			if option.IgnoreConfig then continue end
 
 			table.insert(data.objects, ClassParser[option.Class].Save(flag, option))
-		end	
+		end
 
 		local success, encoded = pcall(HttpService.JSONEncode, HttpService, data)
 		if not success then
@@ -6330,8 +6685,8 @@ function WMacLib:Window(Settings)
 
 		for _, option in next, decoded.objects do
 			if ClassParser[option.type] then
-				task.spawn(function() 
-					ClassParser[option.type].Load(option.flag, option) 
+				task.spawn(function()
+					ClassParser[option.type].Load(option.flag, option)
 				end)
 			end
 		end
