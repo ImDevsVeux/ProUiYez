@@ -1,3 +1,4 @@
+
 --[[
 added new themes  
 and more
@@ -310,11 +311,8 @@ end
 --// Library Functions
 function WMacLib:Window(Settings)
 	local WindowFunctions = {Settings = Settings}
-	if Settings.AcrylicBlur ~= nil then
-		acrylicBlur = Settings.AcrylicBlur
-	else
-		acrylicBlur = true
-	end
+	-- the window is always solid (no acrylic / see-through look)
+	acrylicBlur = false
 
 	local _defaultTheme = {
 		Accent = Color3.fromRGB(24, 24, 27),
@@ -380,7 +378,7 @@ function WMacLib:Window(Settings)
 	base.Name = "Base"
 	base.AnchorPoint = Vector2.new(0.5, 0.5)
 	setThemed(base, "BackgroundColor3", "Background")
-	base.BackgroundTransparency = Settings.AcrylicBlur and 0.05 or 0
+	base.BackgroundTransparency = 0
 	base.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	base.BorderSizePixel = 0
 	base.Position = UDim2.fromScale(0.5, 0.5)
@@ -567,6 +565,7 @@ function WMacLib:Window(Settings)
 		applyState(button, isEnabled)
 	end
 
+	controls.Visible = false -- replaced by the "-" and "x" buttons in the top bar
 	controls.Parent = windowControls
 
 	local divider1 = Instance.new("Frame")
@@ -1019,119 +1018,121 @@ function WMacLib:Window(Settings)
 	uIPadding2.PaddingRight = UDim.new(0, 20)
 	uIPadding2.Parent = elements
 
-	local moveIcon = Instance.new("ImageButton")
-	moveIcon.Name = "MoveIcon"
-	moveIcon.Image = assets.transform
-	moveIcon.ImageTransparency = 0.7
-	moveIcon.AnchorPoint = Vector2.new(1, 0.5)
-	moveIcon.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	moveIcon.BackgroundTransparency = 1
-	moveIcon.BorderColor3 = Color3.fromRGB(0, 0, 0)
-	moveIcon.BorderSizePixel = 0
-	moveIcon.Position = UDim2.fromScale(1, 0.5)
-	moveIcon.Size = UDim2.fromOffset(15, 15)
-	moveIcon.Parent = elements
-	moveIcon.Visible = not Settings.DragStyle or Settings.DragStyle == 1
+	-- Window buttons (top right): "-" minimize, "x" close. Replaces the old drag icon.
+	local WinUI = {}
+	do
+		local topButtons = Instance.new("Frame")
+		topButtons.Name = "TopButtons"
+		topButtons.AnchorPoint = Vector2.new(1, 0.5)
+		topButtons.BackgroundTransparency = 1
+		topButtons.BorderSizePixel = 0
+		topButtons.Position = UDim2.fromScale(1, 0.5)
+		topButtons.Size = UDim2.fromOffset(58, 26)
+		topButtons.Parent = elements
 
-	local interact = Instance.new("TextButton")
-	interact.Name = "Interact"
-	interact.FontFace = Font.new("rbxasset://fonts/families/SourceSansPro.json")
-	interact.Text = ""
-	interact.TextColor3 = Color3.fromRGB(0, 0, 0)
-	interact.TextSize = 14
-	interact.AnchorPoint = Vector2.new(0.5, 0.5)
-	interact.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	interact.BackgroundTransparency = 1
-	interact.BorderColor3 = Color3.fromRGB(0, 0, 0)
-	interact.BorderSizePixel = 0
-	interact.Position = UDim2.fromScale(0.5, 0.5)
-	interact.Size = UDim2.fromOffset(40, 40)
-	interact.Parent = moveIcon
+		local topLayout = Instance.new("UIListLayout")
+		topLayout.FillDirection = Enum.FillDirection.Horizontal
+		topLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+		topLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+		topLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		topLayout.Padding = UDim.new(0, 6)
+		topLayout.Parent = topButtons
 
-	local function ChangemoveIconState(State)
-		if State == "Default" then
-			Tween(moveIcon, TweenInfo.new(0.2, Enum.EasingStyle.Sine), {
-				ImageTransparency = 0.7
-			}):Play()
-		elseif State == "Hover" then
-			Tween(moveIcon, TweenInfo.new(0.2, Enum.EasingStyle.Sine), {
-				ImageTransparency = 0.4
-			}):Play()
+		local function glyphBar(parent, width, rotation)
+			local bar = Instance.new("Frame")
+			bar.Name = "Glyph"
+			bar.AnchorPoint = Vector2.new(0.5, 0.5)
+			bar.Position = UDim2.fromScale(0.5, 0.5)
+			bar.Size = UDim2.fromOffset(width, 2)
+			bar.Rotation = rotation or 0
+			bar.BackgroundTransparency = 0.25
+			bar.BorderSizePixel = 0
+			setThemed(bar, "BackgroundColor3", "Text")
+			local c = Instance.new("UICorner")
+			c.CornerRadius = UDim.new(1, 0)
+			c.Parent = bar
+			bar.Parent = parent
 		end
-	end
 
-	interact.MouseEnter:Connect(function()
-		ChangemoveIconState("Hover")
-	end)
-	interact.MouseLeave:Connect(function()
-		ChangemoveIconState("Default")
-	end)
+		local function makeTopButton(name, order, hoverColor, hoverTransparency)
+			local button = Instance.new("TextButton")
+			button.Name = name
+			button.Text = ""
+			button.AutoButtonColor = false
+			button.LayoutOrder = order
+			button.Size = UDim2.fromOffset(26, 26)
+			button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			button.BackgroundTransparency = 0.93
+			button.BorderSizePixel = 0
 
-	local dragging_ = false
-	local dragInput
-	local dragStart
-	local startPos
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 7)
+			corner.Parent = button
 
-	local function update(input)
-		local delta = input.Position - dragStart
-		base.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-	end
+			local btnStroke = Instance.new("UIStroke")
+			btnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			setThemed(btnStroke, "Color", "Outline")
+			btnStroke.Transparency = 0.9
+			btnStroke.Parent = button
 
-	local function onDragStart(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging_ = true
-			dragInput = input
-			dragStart = input.Position
-			startPos = base.Position
+			button.MouseEnter:Connect(function()
+				Tween(button, TweenInfo.new(0.15, Enum.EasingStyle.Sine), {
+					BackgroundColor3 = hoverColor,
+					BackgroundTransparency = hoverTransparency
+				}):Play()
+			end)
+			button.MouseLeave:Connect(function()
+				Tween(button, TweenInfo.new(0.15, Enum.EasingStyle.Sine), {
+					BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+					BackgroundTransparency = 0.93
+				}):Play()
+			end)
+
+			button.Parent = topButtons
+			return button
 		end
-	end
 
-	local function onDragUpdate(input)
-		if dragging_ and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			dragInput = input
+		WinUI.Minimize = makeTopButton("MinimizeButton", 1, Color3.fromRGB(255, 255, 255), 0.82)
+		glyphBar(WinUI.Minimize, 12, 0)
+
+		WinUI.Close = makeTopButton("CloseButton", 2, Color3.fromRGB(250, 93, 86), 0.6)
+		glyphBar(WinUI.Close, 14, 45)
+		glyphBar(WinUI.Close, 14, -45)
+
+		if Settings.DisabledWindowControls then
+			if table.find(Settings.DisabledWindowControls, "Minimize") then WinUI.Minimize.Visible = false end
+			if table.find(Settings.DisabledWindowControls, "Exit") then WinUI.Close.Visible = false end
 		end
-	end
 
-	if not Settings.DragStyle or Settings.DragStyle == 1 then
-		interact.InputBegan:Connect(function(input)
+		-- Dragging: hold the top bar (title area) and move. DragStyle 2 still drags from anywhere.
+		local dragging_ = false
+		local dragStart, startPos
+
+		local function onDragStart(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				onDragStart(input)
+				dragging_ = true
+				dragStart = input.Position
+				startPos = base.Position
 			end
-		end)
+		end
 
-		interact.InputChanged:Connect(onDragUpdate)
+		if Settings.DragStyle == 2 then
+			base.InputBegan:Connect(onDragStart)
+		else
+			topbar.InputBegan:Connect(onDragStart)
+			windowControls.InputBegan:Connect(onDragStart)
+		end
 
 		UserInputService.InputChanged:Connect(function(input)
-			if input == dragInput and dragging_ then
-				update(input)
+			if dragging_ and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+				local delta = input.Position - dragStart
+				base.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 			end
 		end)
 
 		UserInputService.InputEnded:Connect(function(input)
-			if input == dragInput then
-				dragging_ = false
-				dragInput = nil
-			end
-		end)
-	elseif Settings.DragStyle == 2 then
-		base.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				onDragStart(input)
-			end
-		end)
-
-		base.InputChanged:Connect(onDragUpdate)
-
-		UserInputService.InputChanged:Connect(function(input)
-			if input == dragInput and dragging_ then
-				update(input)
-			end
-		end)
-
-		UserInputService.InputEnded:Connect(function(input)
-			if input == dragInput then
 				dragging_ = false
-				dragInput = nil
 			end
 		end)
 	end
@@ -5878,9 +5879,14 @@ function WMacLib:Window(Settings)
 		return notifications.Visible
 	end
 
+	local pillContainer
+
 	function WindowFunctions:SetState(State)
 		windowState = State
 		base.Visible = State
+		if State and pillContainer then
+			pillContainer.Visible = false
+		end
 	end
 
 	function WindowFunctions:GetState()
@@ -5924,11 +5930,148 @@ function WMacLib:Window(Settings)
 		end
 	end)
 
-	minimize.MouseButton1Click:Connect(ToggleMenu)
-	exit.MouseButton1Click:Connect(function()
+	-- Minimized pill (like WindUI's open button): sits at the top of the screen, click it to reopen.
+	do
+		local rainbow = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(73, 230, 133)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 150, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 100, 180)),
+		})
+		local restPos = UDim2.new(0.5, 0, 0, 12)
+
+		local pill = Instance.new("TextButton")
+		pill.Name = "MinimizedPill"
+		pill.Text = ""
+		pill.AutoButtonColor = false
+		pill.AnchorPoint = Vector2.new(0.5, 0)
+		pill.Position = restPos
+		pill.Size = UDim2.fromOffset(0, 40)
+		pill.AutomaticSize = Enum.AutomaticSize.X
+		pill.BorderSizePixel = 0
+		pill.Visible = false
+		pill.ZIndex = 5
+		setThemed(pill, "BackgroundColor3", "Background")
+
+		local pillCorner = Instance.new("UICorner")
+		pillCorner.CornerRadius = UDim.new(1, 0)
+		pillCorner.Parent = pill
+
+		local pillStroke = Instance.new("UIStroke")
+		pillStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		pillStroke.Color = Color3.fromRGB(255, 255, 255)
+		pillStroke.Thickness = 1.5
+		pillStroke.Parent = pill
+
+		local strokeGradient = Instance.new("UIGradient")
+		strokeGradient.Color = rainbow
+		strokeGradient.Parent = pillStroke
+
+		local pillScale = Instance.new("UIScale")
+		pillScale.Parent = pill
+
+		local pillLayout = Instance.new("UIListLayout")
+		pillLayout.FillDirection = Enum.FillDirection.Horizontal
+		pillLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+		pillLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		pillLayout.Padding = UDim.new(0, 9)
+		pillLayout.Parent = pill
+
+		local pillPadding = Instance.new("UIPadding")
+		pillPadding.PaddingLeft = UDim.new(0, 14)
+		pillPadding.PaddingRight = UDim.new(0, 16)
+		pillPadding.Parent = pill
+
+		local dot = Instance.new("Frame")
+		dot.Name = "Dot"
+		dot.Size = UDim2.fromOffset(10, 10)
+		dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		dot.BorderSizePixel = 0
+		dot.LayoutOrder = 1
+		dot.Parent = pill
+
+		local dotCorner = Instance.new("UICorner")
+		dotCorner.CornerRadius = UDim.new(1, 0)
+		dotCorner.Parent = dot
+
+		local dotGradient = Instance.new("UIGradient")
+		dotGradient.Color = rainbow
+		dotGradient.Rotation = 45
+		dotGradient.Parent = dot
+
+		local pillTitle = Instance.new("TextLabel")
+		pillTitle.Name = "Title"
+		pillTitle.FontFace = Font.new(assets.interFont)
+		pillTitle.RichText = true
+		pillTitle.Text = styleTitle(Settings.Title)
+		setThemed(pillTitle, "TextColor3", "Text")
+		pillTitle.TextSize = 16
+		pillTitle.BackgroundTransparency = 1
+		pillTitle.AutomaticSize = Enum.AutomaticSize.XY
+		pillTitle.LayoutOrder = 2
+		pillTitle.Parent = pill
+
+		pill.MouseEnter:Connect(function()
+			Tween(pillScale, TweenInfo.new(0.12, Enum.EasingStyle.Sine), { Scale = 1.04 }):Play()
+		end)
+		pill.MouseLeave:Connect(function()
+			Tween(pillScale, TweenInfo.new(0.12, Enum.EasingStyle.Sine), { Scale = 1 }):Play()
+		end)
+
+		-- drag the pill around; a click without moving reopens the menu
+		local pDrag, pMoved, pStart, pStartPos = false, false, nil, nil
+
+		pill.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+				pDrag, pMoved = true, false
+				pStart = input.Position
+				pStartPos = pill.Position
+			end
+		end)
+
+		UserInputService.InputChanged:Connect(function(input)
+			if pDrag and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+				local delta = input.Position - pStart
+				if delta.Magnitude > 6 then
+					pMoved = true
+				end
+				if pMoved then
+					pill.Position = UDim2.new(pStartPos.X.Scale, pStartPos.X.Offset + delta.X, pStartPos.Y.Scale, pStartPos.Y.Offset + delta.Y)
+				end
+			end
+		end)
+
+		UserInputService.InputEnded:Connect(function(input)
+			if pDrag and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+				pDrag = false
+				if pMoved then
+					restPos = pill.Position
+				elseif not unloaded then
+					WindowFunctions:SetState(true)
+				end
+			end
+		end)
+
+		pill.Parent = macLib
+		pillContainer = pill
+
+		function WindowFunctions:Minimize()
+			if unloaded then return end
+			WindowFunctions:SetState(false)
+			pill.Position = UDim2.new(restPos.X.Scale, restPos.X.Offset, restPos.Y.Scale, restPos.Y.Offset - 30)
+			pill.Visible = true
+			Tween(pill, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Position = restPos }):Play()
+		end
+
+		function WindowFunctions:Restore()
+			WindowFunctions:SetState(true)
+		end
+	end
+
+	-- "x": warning first, then the window is really closed (same flow as WindUI)
+	function WindowFunctions:Close()
 		WindowFunctions:Dialog({
 			Title = Settings.Title,
-			Description = "Are you sure you want to exit the menu? You will lose any unsaved configurations.",
+			Description = "Are you sure you want to close this window? Any unsaved configuration will be lost and the menu can't be reopened.",
 			Buttons = {
 				{
 					Name = "Confirm",
@@ -5941,6 +6084,13 @@ function WMacLib:Window(Settings)
 				}
 			}
 		})
+	end
+
+	WinUI.Minimize.MouseButton1Click:Connect(function()
+		WindowFunctions:Minimize()
+	end)
+	WinUI.Close.MouseButton1Click:Connect(function()
+		WindowFunctions:Close()
 	end)
 
 	function WindowFunctions:SetKeybind(Keycode)
@@ -5948,8 +6098,9 @@ function WMacLib:Window(Settings)
 	end
 
 	function WindowFunctions:SetAcrylicBlurState(State)
-		acrylicBlur = State
-		base.BackgroundTransparency = State and 0.05 or 0
+		-- kept for compatibility: the window stays solid
+		acrylicBlur = false
+		base.BackgroundTransparency = 0
 	end
 
 	function WindowFunctions:GetAcrylicBlurState()
