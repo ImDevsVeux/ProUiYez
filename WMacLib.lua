@@ -3,6 +3,8 @@
 added new themes  
 and more
 todo: faster loading lucide icons 
+NOTE - THIS UI LIB NOT MINE so whoever made Wmac lib
+credits to them and the person who remake it thanks to him too!
 ]]
 
 local WMacLib = { 
@@ -5932,11 +5934,6 @@ function WMacLib:Window(Settings)
 
 	-- Minimized pill (like WindUI's open button): sits at the top of the screen, click it to reopen.
 	do
-		local rainbow = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.fromRGB(73, 230, 133)),
-			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(100, 150, 255)),
-			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 100, 180)),
-		})
 		local restPos = UDim2.new(0.5, 0, 0, 12)
 
 		local pill = Instance.new("TextButton")
@@ -5959,12 +5956,9 @@ function WMacLib:Window(Settings)
 		local pillStroke = Instance.new("UIStroke")
 		pillStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		pillStroke.Color = Color3.fromRGB(255, 255, 255)
-		pillStroke.Thickness = 1.5
+		pillStroke.Thickness = 1
+		pillStroke.Transparency = 0.75
 		pillStroke.Parent = pill
-
-		local strokeGradient = Instance.new("UIGradient")
-		strokeGradient.Color = rainbow
-		strokeGradient.Parent = pillStroke
 
 		local pillScale = Instance.new("UIScale")
 		pillScale.Parent = pill
@@ -5977,34 +5971,16 @@ function WMacLib:Window(Settings)
 		pillLayout.Parent = pill
 
 		local pillPadding = Instance.new("UIPadding")
-		pillPadding.PaddingLeft = UDim.new(0, 14)
+		pillPadding.PaddingLeft = UDim.new(0, 16)
 		pillPadding.PaddingRight = UDim.new(0, 16)
 		pillPadding.Parent = pill
 
-		local dot = Instance.new("Frame")
-		dot.Name = "Dot"
-		dot.Size = UDim2.fromOffset(10, 10)
-		dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-		dot.BorderSizePixel = 0
-		dot.LayoutOrder = 1
-		dot.Parent = pill
-
-		local dotCorner = Instance.new("UICorner")
-		dotCorner.CornerRadius = UDim.new(1, 0)
-		dotCorner.Parent = dot
-
-		local dotGradient = Instance.new("UIGradient")
-		dotGradient.Color = rainbow
-		dotGradient.Rotation = 45
-		dotGradient.Parent = dot
-
 		local pillTitle = Instance.new("TextLabel")
 		pillTitle.Name = "Title"
-		pillTitle.FontFace = Font.new(assets.interFont)
-		pillTitle.RichText = true
-		pillTitle.Text = styleTitle(Settings.Title)
-		setThemed(pillTitle, "TextColor3", "Text")
-		pillTitle.TextSize = 16
+		pillTitle.FontFace = Font.fromEnum(Enum.Font.Cartoon)
+		pillTitle.Text = tostring(Settings.Title or "")
+		pillTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+		pillTitle.TextSize = 18
 		pillTitle.BackgroundTransparency = 1
 		pillTitle.AutomaticSize = Enum.AutomaticSize.XY
 		pillTitle.LayoutOrder = 2
